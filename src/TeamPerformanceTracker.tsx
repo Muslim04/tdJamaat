@@ -100,7 +100,7 @@ const TeamPerformanceTracker: React.FC = () => {
 
     const calculatePerformancePercentage = (actual: number, target: number): number => {
         if (target === 0) return 0;
-        return Math.min((actual / target) * 100, 150);
+        return (actual / target) * 100;
     };
 
     const calculateMemberScore = (member: TeamMember): number => {
@@ -148,12 +148,17 @@ const TeamPerformanceTracker: React.FC = () => {
     };
 
     const getOverallTeamRankings = (teams: Team[]) => {
-        return teams.map((team, idx) => ({
-            name: team.name,
-            index: idx,
-            score: calculateTeamScore(team),
-            avgMemberScore: Math.round(team.members.reduce((sum, m) => sum + calculateMemberScore(m), 0) / team.members.length * 10) / 10
-        })).sort((a, b) => b.score - a.score).map((team, rank) => ({
+        return teams.map((team, idx) => {
+            const totalScore = calculateTeamScore(team);
+            const avgMemberScore = Math.round(team.members.reduce((sum, m) => sum + calculateMemberScore(m), 0) / team.members.length * 10) / 10;
+            return {
+                name: team.name,
+                index: idx,
+                totalScore: totalScore,
+                avgMemberScore: avgMemberScore,
+                memberCount: team.members.length
+            };
+        }).sort((a, b) => b.avgMemberScore - a.avgMemberScore).map((team, rank) => ({
             ...team,
             rank: rank + 1
         }));
@@ -175,7 +180,7 @@ const TeamPerformanceTracker: React.FC = () => {
                 progressByTeam[teamRank.name].push({
                     week: `Апта ${weekData.weekNumber}`,
                     weekNumber: weekData.weekNumber,
-                    score: teamRank.score,
+                    score: teamRank.avgMemberScore,
                     rank: teamRank.rank,
                     date: weekData.date
                 });
@@ -219,8 +224,8 @@ const TeamPerformanceTracker: React.FC = () => {
 
     const teamChartData = teamRankings.map(team => ({
         name: team.name,
-        score: team.score,
-        avgScore: team.avgMemberScore
+        avgScore: team.avgMemberScore,
+        totalScore: team.totalScore
     }));
 
     const memberChartData = currentTeamRankings.map(member => ({
@@ -250,7 +255,7 @@ const TeamPerformanceTracker: React.FC = () => {
                             <Award className="w-10 h-10 text-indigo-600" />
                             <div>
                                 <h1 className="text-3xl font-bold text-gray-800">Командалар боюнча рейтинг системасы</h1>
-                                <p className="text-gray-600">6 команданын ишмердүүлүгүн талдоо</p>
+                                <p className="text-gray-600">Жааматтын ишмердүүлүгүн талдоо</p>
                             </div>
                         </div>
                         <button
@@ -302,7 +307,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                 <code className="block bg-gray-800 text-green-400 p-3 rounded">
                                     Ишке ашыруу % = (Факт / Максат) × 100
                                 </code>
-                                <p className="text-sm text-gray-600 mt-2">Эскертүү: Максималдуу чектөө 150%</p>
+                                <p className="text-sm text-gray-600 mt-2">Эскертүү: Чектөө жок - максаттан канча гана ашса да эсептелет</p>
                             </div>
 
                             <div className="bg-gray-50 p-4 rounded-lg">
@@ -329,6 +334,17 @@ const TeamPerformanceTracker: React.FC = () => {
                                 <code className="block bg-gray-800 text-green-400 p-3 rounded">
                                     Жалпы упай = Σ (Бардык көрсөткүчтөрдүн упайы)
                                 </code>
+                            </div>
+
+                            <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-400">
+                                <p className="font-semibold text-yellow-900 mb-2">⚠️ МААНИЛҮҮ: Командалардын рейтинги</p>
+                                <div className="text-sm space-y-2">
+                                    <p className="text-yellow-800">Командалардын ортосундагы рейтинг <strong>ОРТОЧО УПАЙГА</strong> негизделген (жалпы упайга эмес).</p>
+                                    <p className="text-yellow-800">Себеби: Кээ бир командаларда аз адам бар, ошондуктан адилеттүүлүк үчүн орточо упай колдонулат.</p>
+                                    <code className="block bg-gray-800 text-green-400 p-2 rounded mt-2">
+                                        Команда рейтинги = Орточо упай (Жалпы упай / Мүчөлөрдүн саны)
+                                    </code>
+                                </div>
                             </div>
 
                             <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-300">
@@ -380,6 +396,16 @@ const TeamPerformanceTracker: React.FC = () => {
 
                 {activeView === 'overview' ? (
                     <>
+                        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-6">
+                            <div className="flex items-start gap-2">
+                                <Info className="w-5 h-5 text-yellow-700 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm text-yellow-800">
+                                    <p className="font-semibold mb-1">Рейтинг орточо упайга негизделген</p>
+                                    <p>Командалардын саны ар башка болгондуктан, адилеттүүлүк үчүн рейтинг орточо упайга негизделген (жалпы упайга эмес). Орточо упай = Жалпы упай ÷ Мүчөлөрдүн саны</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                             <h2 className="text-2xl font-bold text-gray-800 mb-4">Командалардын жалпы рейтинги</h2>
                             <div className="overflow-x-auto">
@@ -388,8 +414,9 @@ const TeamPerformanceTracker: React.FC = () => {
                                         <tr>
                                             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Рейтинг</th>
                                             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Команда</th>
+                                            <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Мүчөлөр</th>
+                                            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Орточо упай ⭐</th>
                                             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Жалпы упай</th>
-                                            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Орточо упай</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
@@ -405,8 +432,9 @@ const TeamPerformanceTracker: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 font-medium text-gray-900">{team.name}</td>
-                                                <td className="px-6 py-4 text-right font-semibold text-indigo-600">{team.score}</td>
-                                                <td className="px-6 py-4 text-right text-gray-600">{team.avgMemberScore}</td>
+                                                <td className="px-6 py-4 text-center text-gray-600">{team.memberCount}</td>
+                                                <td className="px-6 py-4 text-right font-bold text-indigo-600 text-lg">{team.avgMemberScore}</td>
+                                                <td className="px-6 py-4 text-right text-gray-500">{team.totalScore}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -423,8 +451,8 @@ const TeamPerformanceTracker: React.FC = () => {
                                     <YAxis />
                                     <Tooltip />
                                     <Legend />
-                                    <Bar dataKey="score" fill="#4F46E5" name="Жалпы упай" />
-                                    <Bar dataKey="avgScore" fill="#818CF8" name="Орточо упай" />
+                                    <Bar dataKey="avgScore" fill="#4F46E5" name="Орточо упай (Рейтинг)" />
+                                    <Bar dataKey="totalScore" fill="#CBD5E1" name="Жалпы упай" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -550,11 +578,12 @@ const TeamPerformanceTracker: React.FC = () => {
                     <>
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                             <h2 className="text-2xl font-bold text-gray-800 mb-4">Командалардын апталык прогресси</h2>
+                            <p className="text-sm text-gray-600 mb-4">График орточо упайга негизделген (адилеттүү салыштыруу үчүн)</p>
                             <ResponsiveContainer width="100%" height={500}>
                                 <LineChart data={lineChartData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="week" />
-                                    <YAxis label={{ value: 'Упай', angle: -90, position: 'insideLeft' }} />
+                                    <YAxis label={{ value: 'Орточо упай', angle: -90, position: 'insideLeft' }} />
                                     <Tooltip />
                                     <Legend />
                                     {currentWeekData.teams.map((team, idx) => (
@@ -585,7 +614,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                             <h3 className="font-bold text-lg mb-2" style={{ color: TEAM_COLORS[idx] }}>{team.name}</h3>
                                             <div className="space-y-2 text-sm">
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-600">Азыркы упай:</span>
+                                                    <span className="text-gray-600">Азыркы орточо:</span>
                                                     <span className="font-semibold">{currentScore.toFixed(1)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
