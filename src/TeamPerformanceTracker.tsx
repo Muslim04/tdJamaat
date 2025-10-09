@@ -63,7 +63,7 @@ const TeamPerformanceTracker: React.FC = () => {
 
     // Scoring weights
     const weights: MetricValues = {
-        'К-К': 2.0,
+        'К-К': 10.0,
         'СВТ': 0.015,
         'КТП': 1.5,
         'ТХЖ': 15,
@@ -477,6 +477,41 @@ const TeamPerformanceTracker: React.FC = () => {
                         </div>
 
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            {/* MiniCard section for team activity summary */}
+                            <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                                <h3 className="text-xl font-semibold text-gray-800 mb-4">Команданын активдүүлүк көрсөткүчтөрү</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                                    {Object.entries(currentWeekData.teams[activeTeam].miniCard).map(([key, value]) => {
+                                        const percent = value.target > 0 ? (value.actual / value.target) * 100 : 0;
+                                        return (
+                                            <div
+                                                key={key}
+                                                className="bg-white rounded-lg shadow p-4 flex flex-col items-center justify-center border border-indigo-100"
+                                            >
+                                                <span className="font-semibold text-gray-700 mb-1">{key}</span>
+                                                <div className="text-center">
+                                                    <p className="text-lg font-bold text-indigo-600">
+                                                        {value.actual}/{value.target}
+                                                    </p>
+                                                    <p
+                                                        className={`text-sm font-semibold mt-1 ${percent >= 100
+                                                            ? 'text-green-600'
+                                                            : percent >= 75
+                                                                ? 'text-blue-600'
+                                                                : percent >= 50
+                                                                    ? 'text-yellow-600'
+                                                                    : 'text-red-600'
+                                                            }`}
+                                                    >
+                                                        {percent.toFixed(0)}%
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             <h2 className="text-2xl font-bold text-gray-800 mb-4">
                                 {currentWeekData.teams[activeTeam].name} - Мүчөлөрдүн рейтинги
                             </h2>
