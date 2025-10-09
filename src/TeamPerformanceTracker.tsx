@@ -624,7 +624,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-600">Апталар:</span>
+                                                    <span className="text-gray-600">Апталар :</span>
                                                     <span className="font-semibold">{teamProgress.length}</span>
                                                 </div>
                                             </div>
