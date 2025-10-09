@@ -537,7 +537,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                     <Tooltip />
                                     <Legend />
                                     <Bar dataKey="score" name="Упай">
-                                        {memberChartData.map((entry, index) => {
+                                        {memberChartData.map((_entry, index) => {
                                             const member = currentTeamRankings[index];
                                             return <Cell key={`cell-${index}`} fill={COLORS[member.role]} />;
                                         })}
