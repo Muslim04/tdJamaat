@@ -63,11 +63,11 @@ const TeamPerformanceTracker: React.FC = () => {
 
     // Scoring weights
     const weights: MetricValues = {
-        'К-К': 10.0,
+        'К-К': 5.0,
         'СВТ': 0.015,
         'КТП': 1.5,
         'ТХЖ': 15,
-        'ДТА': 10,
+        'ДТА': 20,
         'ИСТГ': 0.08,
         'НФ': 2.5,
         'ТСП': 4
@@ -111,7 +111,7 @@ const TeamPerformanceTracker: React.FC = () => {
             const actual = member.actual[metric] || 0;
             const target = member.target[metric] || 1;
             const performancePercentage = calculatePerformancePercentage(actual, target);
-            const metricScore = (performancePercentage / 100) * weights[metric] * target;
+            const metricScore = (performancePercentage / 100) * weights[metric];
             totalScore += metricScore;
         });
 
@@ -313,7 +313,7 @@ const TeamPerformanceTracker: React.FC = () => {
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <p className="font-semibold text-gray-700 mb-2">2. Ар бир көрсөткүч үчүн упай:</p>
                                 <code className="block bg-gray-800 text-green-400 p-3 rounded">
-                                    Көрсөткүч упайы = (Ишке ашыруу % / 100) × Салмак × Максат
+                                    Көрсөткүч упайы = (Ишке ашыруу % / 100) × Салмак
                                 </code>
                                 <p className="text-sm text-gray-600 mt-2">Бул жогорку максаты барлар үчүн адилеттүүлүктү камсыз кылат</p>
                             </div>
