@@ -350,8 +350,8 @@ const TeamPerformanceTracker: React.FC = () => {
                             <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-300">
                                 <p className="font-semibold text-blue-900 mb-2">Мисал:</p>
                                 <div className="text-sm space-y-1">
-                                    <p><strong>Жетекчи:</strong> К-К Максат=20, Факт=15 → 15/20=75% → 0.75 × 2.0 × 20 = <strong>30 упай</strong></p>
-                                    <p><strong>Мүчө:</strong> К-К Максат=7, Факт=7 → 7/7=100% → 1.0 × 2.0 × 7 = <strong>14 упай</strong></p>
+                                    <p><strong>Жетекчи:</strong> К-К Максат=20, Факт=15 → 15/20=75% → 0.75 × 5.0 = <strong>3.75 упай</strong></p>
+                                    <p><strong>Мүчө:</strong> К-К Максат=7, Факт=7 → 7/7=100% → 1.0 × 5.0 = <strong>5 упай</strong></p>
                                     <p className="text-blue-700 mt-2">Экөө тең өз максаттарына жете албады/жетти, бирок упайлар максатка жараша адилеттүү</p>
                                 </div>
                             </div>
