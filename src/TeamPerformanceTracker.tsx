@@ -60,17 +60,18 @@ const TeamPerformanceTracker: React.FC = () => {
     const [showFormula, setShowFormula] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [roleFilter, setRoleFilter] = useState<'all' | 'leader' | 'assistant' | 'member'>('all');
 
     // Scoring weights
     const weights: MetricValues = {
-        'К-К': 5.0,
-        'СВТ': 0.015,
-        'КТП': 1.5,
-        'ТХЖ': 15,
-        'ДТА': 20,
-        'ИСТГ': 0.08,
-        'НФ': 2.5,
-        'ТСП': 4
+        'К-К': 45.0,
+        'СВТ': 15.0,
+        'КТП': 35.0,
+        'ТХЖ': 20.0,
+        'ДТА': 30.0,
+        'ИСТГ': 10.0,
+        'НФ': 20.0,
+        'ТСП': 25.0
     };
 
     // Load data from JSON file
@@ -221,6 +222,22 @@ const TeamPerformanceTracker: React.FC = () => {
     const teamRankings = getOverallTeamRankings(currentWeekData.teams);
     const currentTeamRankings = getTeamMemberRankings(currentWeekData.teams[activeTeam]);
     const progressData = getProgressData();
+    // Combine all members across all teams
+    const allIndividuals = currentWeekData.teams.flatMap(team =>
+        team.members.map(member => ({
+            ...member,
+            team: team.name,
+            score: calculateMemberScore(member)
+        }))
+    );
+
+    // Sort by score descending
+    const sortedIndividuals = allIndividuals.sort((a, b) => b.score - a.score);
+
+    // Filter based on selected role
+    const filteredIndividuals = roleFilter === 'all'
+        ? sortedIndividuals
+        : sortedIndividuals.filter(m => m.role === roleFilter);
 
     const teamChartData = teamRankings.map(team => ({
         name: team.name,
@@ -407,6 +424,82 @@ const TeamPerformanceTracker: React.FC = () => {
                         </div>
 
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            {/* New Section: Individual Rankings Across All Teams */}
+                            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                                <h2 className="text-2xl font-bold text-gray-800 mb-4">Бардык катышуучулардын рейтинги</h2>
+
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {(['all', 'leader', 'assistant', 'member'] as const).map(roleType => (
+                                        <button
+                                            key={roleType}
+                                            onClick={() => setRoleFilter(roleType)}
+                                            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${roleFilter === roleType
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            {roleType === 'all' ? 'Бардыгы' :
+                                                roleType === 'leader' ? 'Жетекчилер' :
+                                                    roleType === 'assistant' ? 'Орун басарлар' : 'Мүчөлөр'}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="overflow-x-auto mb-6">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-indigo-50">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left font-semibold text-gray-700">№</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-gray-700">Аты</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-gray-700">Команда</th>
+                                                <th className="px-3 py-2 text-left font-semibold text-gray-700">Ролу</th>
+                                                <th className="px-3 py-2 text-right font-semibold text-gray-700">Упай ⭐</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {filteredIndividuals.map((member, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-3 py-2">
+                                                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-bold text-sm ${idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                                            idx === 1 ? 'bg-gray-300 text-gray-800' :
+                                                                idx === 2 ? 'bg-orange-400 text-orange-900' :
+                                                                    'bg-indigo-100 text-indigo-800'
+                                                            }`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2 font-medium text-gray-900">{member.name}</td>
+                                                    <td className="px-3 py-2 text-gray-700">{member.team}</td>
+                                                    <td className="px-3 py-2">
+                                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${member.role === 'leader' ? 'bg-red-100 text-red-800' :
+                                                            member.role === 'assistant' ? 'bg-orange-100 text-orange-800' :
+                                                                'bg-indigo-100 text-indigo-800'
+                                                            }`}>
+                                                            {member.role === 'leader' ? 'Жетекчи' :
+                                                                member.role === 'assistant' ? 'Орун басар' : 'Мүчө'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right font-bold text-indigo-600">{member.score}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <ResponsiveContainer width="100%" height={400}>
+                                    <BarChart data={filteredIndividuals.slice(0, 15)}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" />
+                                        <YAxis />
+                                        <Tooltip />
+                                        <Bar dataKey="score" name="Упай">
+                                            {filteredIndividuals.slice(0, 15).map((member, index) => (
+                                                <Cell key={index} fill={COLORS[member.role]} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                             <h2 className="text-2xl font-bold text-gray-800 mb-4">Командалардын жалпы рейтинги</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full">
