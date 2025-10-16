@@ -1,7 +1,7 @@
 // TeamPerformanceTracker.tsx
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
-import { Users, Award, TrendingUp, Info, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Award, TrendingUp, Info, Calendar, ChevronLeft, ChevronRight, User } from 'lucide-react';
 
 // Types
 interface MetricValues {
@@ -275,6 +275,12 @@ const TeamPerformanceTracker: React.FC = () => {
                                 <p className="text-gray-600">Жааматтын ишмердүүлүгүн талдоо</p>
                             </div>
                         </div>
+                        <button
+                            className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                            <User className="w-5 h-5" />
+                            <a href="https://addua.vercel.app/" target="_blank">Санарип тасбихат</a>
+                        </button>
                         <button
                             onClick={() => setShowFormula(!showFormula)}
                             className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
