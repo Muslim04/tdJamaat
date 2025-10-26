@@ -1,56 +1,21 @@
 // TeamPerformanceTracker.tsx
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
-import { Users, Award, TrendingUp, Info, Calendar, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Users, Award, TrendingUp, Info } from 'lucide-react';
 
-// Types
-interface MetricValues {
-    'К-К': number;
-    'СВТ': number;
-    'КТП': number;
-    'ТХЖ': number;
-    'ДТА': number;
-    'ИСТГ': number;
-    'НФ': number;
-    'ТСП': number;
-}
+// Import types
+import type { DataFile } from './types';
 
-interface MiniCardActivity {
-    actual: number;
-    target: number;
-}
+// Import utilities
+import { calculateMemberScore, COLORS, TEAM_COLORS, weights } from './utils/scoring';
+import type { MetricValues } from './types';
+import { getTeamMemberRankings, getOverallTeamRankings, getProgressData } from './utils/rankings';
 
-interface MiniCard {
-    'БГМДТ': MiniCardActivity;
-    'КПТ': MiniCardActivity;
-    'И-Н.2': MiniCardActivity;
-    'КИТЕП': MiniCardActivity;
-    'СПОРТ': MiniCardActivity;
-    'ТСПХ': MiniCardActivity;
-}
-
-interface TeamMember {
-    name: string;
-    role: 'leader' | 'assistant' | 'member';
-    actual: MetricValues;
-    target: MetricValues;
-}
-
-interface Team {
-    name: string;
-    miniCard: MiniCard;
-    members: TeamMember[];
-}
-
-interface WeekData {
-    weekNumber: number;
-    date: string;
-    teams: Team[];
-}
-
-interface DataFile {
-    weeks: WeekData[];
-}
+// Import components
+import { Header } from './components/Header';
+import { WeekSelector } from './components/WeekSelector';
+import { FormulaDisplay } from './components/FormulaDisplay';
+import { ViewNavigator } from './components/ViewNavigator';
 
 const TeamPerformanceTracker: React.FC = () => {
     const [data, setData] = useState<DataFile | null>(null);
@@ -61,18 +26,6 @@ const TeamPerformanceTracker: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [roleFilter, setRoleFilter] = useState<'all' | 'leader' | 'assistant' | 'member'>('all');
-
-    // Scoring weights
-    const weights: MetricValues = {
-        'К-К': 45.0,
-        'СВТ': 15.0,
-        'КТП': 35.0,
-        'ТХЖ': 20.0,
-        'ДТА': 30.0,
-        'ИСТГ': 10.0,
-        'НФ': 20.0,
-        'ТСП': 25.0
-    };
 
     // Load data from JSON file
     useEffect(() => {
@@ -99,106 +52,6 @@ const TeamPerformanceTracker: React.FC = () => {
         loadData();
     }, []);
 
-    const calculatePerformancePercentage = (actual: number, target: number): number => {
-        if (target === 0) return 0;
-        return (actual / target) * 100;
-    };
-
-    const calculateMemberScore = (member: TeamMember): number => {
-        let totalScore = 0;
-        const metrics = Object.keys(weights) as Array<keyof MetricValues>;
-
-        metrics.forEach(metric => {
-            const actual = member.actual[metric] || 0;
-            const target = member.target[metric] || 1;
-            const performancePercentage = calculatePerformancePercentage(actual, target);
-            const metricScore = (performancePercentage / 100) * weights[metric];
-            totalScore += metricScore;
-        });
-
-        return Math.round(totalScore * 10) / 10;
-    };
-
-    const calculateTeamScore = (team: Team): number => {
-        const memberScores = team.members.reduce((sum, member) => sum + calculateMemberScore(member), 0);
-
-        const miniCardScore = Object.keys(team.miniCard).reduce((sum, key) => {
-            const activity = team.miniCard[key as keyof MiniCard];
-            return sum + calculatePerformancePercentage(activity.actual, activity.target);
-        }, 0);
-
-        return Math.round((memberScores + miniCardScore * 0.5) * 10) / 10;
-    };
-
-    const getTeamMemberRankings = (team: Team) => {
-        const membersWithScores = team.members.map((member, idx) => ({
-            ...member,
-            index: idx,
-            score: calculateMemberScore(member),
-            performancePercentages: Object.keys(weights).reduce((acc, metric) => {
-                const m = metric as keyof MetricValues;
-                acc[m] = calculatePerformancePercentage(member.actual[m], member.target[m]);
-                return acc;
-            }, {} as MetricValues)
-        }));
-
-        return membersWithScores.sort((a, b) => b.score - a.score).map((member, rank) => ({
-            ...member,
-            rank: rank + 1
-        }));
-    };
-
-    const getOverallTeamRankings = (teams: Team[]) => {
-        return teams.map((team, idx) => {
-            const totalScore = calculateTeamScore(team);
-            const avgMemberScore = Math.round(team.members.reduce((sum, m) => sum + calculateMemberScore(m), 0) / team.members.length * 10) / 10;
-            return {
-                name: team.name,
-                index: idx,
-                totalScore: totalScore,
-                avgMemberScore: avgMemberScore,
-                memberCount: team.members.length
-            };
-        }).sort((a, b) => b.avgMemberScore - a.avgMemberScore).map((team, rank) => ({
-            ...team,
-            rank: rank + 1
-        }));
-    };
-
-    const getProgressData = (): { [key: string]: any[] } => {
-        if (!data) return {};
-
-        const progressByTeam: { [key: string]: any[] } = {};
-
-        data.weeks.forEach((weekData) => {
-            const rankings = getOverallTeamRankings(weekData.teams);
-
-            rankings.forEach((teamRank) => {
-                if (!progressByTeam[teamRank.name]) {
-                    progressByTeam[teamRank.name] = [];
-                }
-
-                progressByTeam[teamRank.name].push({
-                    week: `Апта ${weekData.weekNumber}`,
-                    weekNumber: weekData.weekNumber,
-                    score: teamRank.avgMemberScore,
-                    rank: teamRank.rank,
-                    date: weekData.date
-                });
-            });
-        });
-
-        return progressByTeam;
-    };
-
-    const COLORS = {
-        leader: '#DC2626',
-        assistant: '#EA580C',
-        member: '#4F46E5'
-    };
-
-    const TEAM_COLORS = ['#4F46E5', '#059669', '#DC2626', '#D97706', '#7C3AED', '#0891B2'];
-
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -221,7 +74,7 @@ const TeamPerformanceTracker: React.FC = () => {
     const currentWeekData = data.weeks[selectedWeek];
     const teamRankings = getOverallTeamRankings(currentWeekData.teams);
     const currentTeamRankings = getTeamMemberRankings(currentWeekData.teams[activeTeam]);
-    const progressData = getProgressData();
+    const progressData = getProgressData(data);
     // Combine all members across all teams
     const allIndividuals = currentWeekData.teams.flatMap(team =>
         team.members.map(member => ({
@@ -266,166 +119,10 @@ const TeamPerformanceTracker: React.FC = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
             <div className="max-w-7xl mx-auto">
-                <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div className="flex items-center gap-3">
-                            <Award className="w-10 h-10 text-indigo-600" />
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-800">Командалар боюнча рейтинг системасы</h1>
-                                <p className="text-gray-600">Жааматтын ишмердүүлүгүн талдоо</p>
-                            </div>
-                        </div>
-                        <button
-                            className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                            <User className="w-5 h-5" />
-                            <a href="https://addua.vercel.app/" target="_blank">Санарип тасбихат</a>
-                        </button>
-                        <button
-                            onClick={() => setShowFormula(!showFormula)}
-                            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                            <Info className="w-5 h-5" />
-                            Формула
-                        </button>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-indigo-600" />
-                            <span className="font-semibold text-gray-700">Апта тандоо:</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setSelectedWeek(Math.max(0, selectedWeek - 1))}
-                                disabled={selectedWeek === 0}
-                                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronLeft className="w-5 h-5" />
-                            </button>
-                            <div className="px-6 py-2 bg-indigo-100 rounded-lg">
-                                <span className="font-bold text-indigo-800">Апта {currentWeekData.weekNumber}</span>
-                                <span className="text-sm text-gray-600 ml-2">({currentWeekData.date})</span>
-                            </div>
-                            <button
-                                onClick={() => setSelectedWeek(Math.min(data.weeks.length - 1, selectedWeek + 1))}
-                                disabled={selectedWeek === data.weeks.length - 1}
-                                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronRight className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Formula Display */}
-                {showFormula && (
-                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-green-500">
-                        <h3 className="text-xl font-bold text-gray-800 mb-4">Упай эсептөө формуласы</h3>
-                        <div className="space-y-4">
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="font-semibold text-gray-700 mb-2">1. Ар бир көрсөткүч үчүн ишке ашыруу пайызы:</p>
-                                <code className="block bg-gray-800 text-green-400 p-3 rounded">
-                                    Ишке ашыруу % = (Факт / Максат) × 100
-                                </code>
-                                <p className="text-sm text-gray-600 mt-2">Эскертүү: Чектөө жок - максаттан канча гана ашса да эсептелет</p>
-                            </div>
-
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="font-semibold text-gray-700 mb-2">2. Ар бир көрсөткүч үчүн упай:</p>
-                                <code className="block bg-gray-800 text-green-400 p-3 rounded">
-                                    Көрсөткүч упайы = (Ишке ашыруу % / 100) × Салмак
-                                </code>
-                                <p className="text-sm text-gray-600 mt-2">Бул жогорку максаты барлар үчүн адилеттүүлүктү камсыз кылат</p>
-                            </div>
-
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="font-semibold text-gray-700 mb-2">3. Салмактар (Weights):</p>
-                                <div className="grid grid-cols-4 gap-2 text-sm">
-                                    {Object.entries(weights).map(([key, value]) => (
-                                        <div key={key} className="bg-white p-2 rounded border">
-                                            <span className="font-semibold">{key}:</span> {value}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="font-semibold text-gray-700 mb-2">4. Жалпы мүчө упайы:</p>
-                                <code className="block bg-gray-800 text-green-400 p-3 rounded">
-                                    Жалпы упай = Σ (Бардык көрсөткүчтөрдүн упайы)
-                                </code>
-                            </div>
-
-                            <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-400">
-                                <p className="font-semibold text-yellow-900 mb-2">⚠️ МААНИЛҮҮ: Командалардын рейтинги</p>
-                                <div className="text-sm space-y-2">
-                                    <p className="text-yellow-800">Командалардын ортосундагы рейтинг <strong>ОРТОЧО УПАЙГА</strong> негизделген (жалпы упайга эмес).</p>
-                                    <p className="text-yellow-800">Себеби: Кээ бир командаларда аз адам бар, ошондуктан адилеттүүлүк үчүн орточо упай колдонулат.</p>
-                                    <code className="block bg-gray-800 text-green-400 p-2 rounded mt-2">
-                                        Команда рейтинги = Орточо упай (Жалпы упай / Мүчөлөрдүн саны)
-                                    </code>
-                                </div>
-                            </div>
-
-                            <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-300">
-                                <p className="font-semibold text-blue-900 mb-2">Мисал:</p>
-                                <div className="text-sm space-y-1">
-                                    <p><strong>Жетекчи:</strong> К-К Максат=20, Факт=15 → 15/20=75% → 0.75 × 5.0 = <strong>3.75 упай</strong></p>
-                                    <p><strong>Мүчө:</strong> К-К Максат=7, Факт=7 → 7/7=100% → 1.0 × 5.0 = <strong>5 упай</strong></p>
-                                    <p className="text-blue-700 mt-2">Экөө тең өз максаттарына жете албады/жетти, бирок упайлар максатка жараша адилеттүү</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setActiveView('overview')}
-                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${activeView === 'overview'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                        >
-                            <Users className="w-5 h-5 inline mr-2" />
-                            Жалпы көрүнүш
-                        </button>
-                        <button
-                            onClick={() => setActiveView('teams')}
-                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${activeView === 'teams'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                        >
-                            <TrendingUp className="w-5 h-5 inline mr-2" />
-                            Команда ичиндеги рейтинг
-                        </button>
-                        <button
-                            onClick={() => setActiveView('progress')}
-                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${activeView === 'progress'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                        >
-                            <Calendar className="w-5 h-5 inline mr-2" />
-                            Апталык прогресс
-                        </button>
-                        <button
-                            onClick={() => setActiveView('fourweekreport')}
-                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${activeView === 'fourweekreport'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                        >
-                            <Award className="w-5 h-5 inline mr-2" />
-                            4-Апталык отчёт
-                        </button>
-                    </div>
-                </div>
+                <Header showFormula={showFormula} setShowFormula={setShowFormula} />
+                <WeekSelector data={data} selectedWeek={selectedWeek} setSelectedWeek={setSelectedWeek} />
+                <FormulaDisplay showFormula={showFormula} />
+                <ViewNavigator activeView={activeView} setActiveView={setActiveView} />
 
                 {activeView === 'overview' ? (
                     <>
