@@ -55,7 +55,7 @@ interface DataFile {
 const TeamPerformanceTracker: React.FC = () => {
     const [data, setData] = useState<DataFile | null>(null);
     const [activeTeam, setActiveTeam] = useState<number>(0);
-    const [activeView, setActiveView] = useState<'overview' | 'teams' | 'progress'>('overview');
+    const [activeView, setActiveView] = useState<'overview' | 'teams' | 'progress' | 'fourweekreport'>('overview');
     const [selectedWeek, setSelectedWeek] = useState<number>(0);
     const [showFormula, setShowFormula] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
@@ -414,6 +414,16 @@ const TeamPerformanceTracker: React.FC = () => {
                             <Calendar className="w-5 h-5 inline mr-2" />
                             Апталык прогресс
                         </button>
+                        <button
+                            onClick={() => setActiveView('fourweekreport')}
+                            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${activeView === 'fourweekreport'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                        >
+                            <Award className="w-5 h-5 inline mr-2" />
+                            4-Апталык отчёт
+                        </button>
                     </div>
                 </div>
 
@@ -708,7 +718,7 @@ const TeamPerformanceTracker: React.FC = () => {
                             </ResponsiveContainer>
                         </div>
                     </>
-                ) : (
+                ) : activeView === 'progress' ? (
                     <>
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                             <h2 className="text-2xl font-bold text-gray-800 mb-4">Командалардын апталык прогресси</h2>
@@ -768,7 +778,264 @@ const TeamPerformanceTracker: React.FC = () => {
                             </div>
                         </div>
                     </>
-                )}
+                ) : activeView === 'fourweekreport' ? (
+                    <>
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <div className="flex items-center gap-3 mb-6">
+                                <Award className="w-8 h-8 text-indigo-600" />
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-800">4-Апталык отчет (Рейтинг)</h2>
+                                    <p className="text-gray-600">Командалардын 4 апта боюнча ортосундагы рейтинги</p>
+                                </div>
+                            </div>
+
+                            {/* Calculate 4-week averages for each team */}
+                            {(() => {
+                                const fourWeekData: Array<{
+                                    teamName: string;
+                                    weeklyScores: number[];
+                                    averageScore: number;
+                                    totalScore: number;
+                                    bestWeek: number;
+                                    worstWeek: number;
+                                    trends: 'up' | 'down' | 'stable';
+                                    ranking: number;
+                                    periodStart: number;
+                                    periodEnd: number;
+                                }> = [];
+
+                                if (data && data.weeks.length > 0) {
+                                    // Calculate which 4-week period to show
+                                    // Always show the most recent complete 4-week period
+                                    const totalWeeks = data.weeks.length;
+                                    const periodIndex = Math.floor((totalWeeks - 1) / 4); // 0 for weeks 1-4, 1 for weeks 5-8, etc.
+                                    const startWeekIndex = periodIndex * 4;
+                                    const endWeekIndex = Math.min(startWeekIndex + 4, totalWeeks);
+                                    
+                                    // Get the weeks for this period
+                                    const weeksForPeriod = data.weeks.slice(startWeekIndex, endWeekIndex);
+                                    const actualStartWeek = weeksForPeriod[0]?.weekNumber || 1;
+                                    const actualEndWeek = weeksForPeriod[weeksForPeriod.length - 1]?.weekNumber || 4;
+                                    
+                                    const teamNames = data.weeks[0]?.teams.map(t => t.name) || [];
+                                    
+                                    teamNames.forEach(teamName => {
+                                        const weeklyScores: number[] = [];
+                                        
+                                        weeksForPeriod.forEach(weekData => {
+                                            const team = weekData.teams.find(t => t.name === teamName);
+                                            if (team) {
+                                                const avgScore = team.members.reduce((sum, m) => sum + calculateMemberScore(m), 0) / team.members.length;
+                                                weeklyScores.push(Math.round(avgScore * 10) / 10);
+                                            }
+                                        });
+
+                                        const averageScore = weeklyScores.length > 0 ? weeklyScores.reduce((sum, score) => sum + score, 0) / weeklyScores.length : 0;
+                                        const totalScore = weeklyScores.reduce((sum, score) => sum + score, 0);
+                                        const bestWeek = weeklyScores.length > 0 ? Math.max(...weeklyScores) : 0;
+                                        const worstWeek = weeklyScores.length > 0 ? Math.min(...weeklyScores) : 0;
+                                        
+                                        // Determine trend
+                                        const firstHalf = weeklyScores.slice(0, Math.ceil(weeklyScores.length / 2)).reduce((a, b) => a + b, 0);
+                                        const secondHalf = weeklyScores.slice(Math.floor(weeklyScores.length / 2)).reduce((a, b) => a + b, 0);
+                                        let trends: 'up' | 'down' | 'stable' = 'stable';
+                                        if (secondHalf > firstHalf) trends = 'up';
+                                        else if (secondHalf < firstHalf) trends = 'down';
+
+                                        fourWeekData.push({
+                                            teamName,
+                                            weeklyScores,
+                                            averageScore: Math.round(averageScore * 10) / 10,
+                                            totalScore: Math.round(totalScore * 10) / 10,
+                                            bestWeek: Math.round(bestWeek * 10) / 10,
+                                            worstWeek: Math.round(worstWeek * 10) / 10,
+                                            trends,
+                                            ranking: 0,
+                                            periodStart: actualStartWeek,
+                                            periodEnd: actualEndWeek
+                                        });
+                                    });
+
+                                    // Sort by average score and assign rankings
+                                    fourWeekData.sort((a, b) => b.averageScore - a.averageScore);
+                                    fourWeekData.forEach((team, idx) => {
+                                        team.ranking = idx + 1;
+                                    });
+                                }
+
+                                return (
+                                    <>
+                                        {fourWeekData.length > 0 && (
+                                            <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-4 mb-6">
+                                                <div className="flex items-start gap-2">
+                                                    <Info className="w-5 h-5 text-blue-700 mt-0.5 flex-shrink-0" />
+                                                    <div className="text-sm text-blue-800">
+                                                        <p className="font-semibold mb-1">
+                                                            Көрсөтүлгөн мезгил: Апта {fourWeekData[0].periodStart} - Апта {fourWeekData[0].periodEnd}
+                                                        </p>
+                                                        <p>Бул отчет эң акыркы толук 4 апта боюнча маалыматты көрсөтөт</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Summary Statistics */}
+                                        {fourWeekData.length > 0 && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                                <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border-2 border-green-300">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <Award className="w-8 h-8 text-green-600" />
+                                                        <h3 className="text-lg font-bold text-green-900">Эң мыкты команда</h3>
+                                                    </div>
+                                                    <p className="text-2xl font-bold text-green-800">{fourWeekData[0]?.teamName}</p>
+                                                    <p className="text-sm text-green-700 mt-1">Орточо упай: {fourWeekData[0]?.averageScore}</p>
+                                                </div>
+
+                                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border-2 border-blue-300">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <TrendingUp className="w-8 h-8 text-blue-600" />
+                                                        <h3 className="text-lg font-bold text-blue-900">Эң тез өсүү</h3>
+                                                    </div>
+                                                    <p className="text-2xl font-bold text-blue-800">
+                                                        {fourWeekData.filter(t => t.trends === 'up').sort((a, b) => {
+                                                            const aDiff = a.weeklyScores[a.weeklyScores.length - 1] - a.weeklyScores[0];
+                                                            const bDiff = b.weeklyScores[b.weeklyScores.length - 1] - b.weeklyScores[0];
+                                                            return bDiff - aDiff;
+                                                        })[0]?.teamName || 'Жок'}
+                                                    </p>
+                                                    <p className="text-sm text-blue-700 mt-1">Ийгиликтуу тенденция</p>
+                                                </div>
+
+                                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border-2 border-purple-300">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <Users className="w-8 h-8 text-purple-600" />
+                                                        <h3 className="text-lg font-bold text-purple-900">Жалпы статистика</h3>
+                                                    </div>
+                                                    <p className="text-2xl font-bold text-purple-800">{fourWeekData.length} команда</p>
+                                                    <p className="text-sm text-purple-700 mt-1">
+                                                        {fourWeekData.length > 0 ? `${fourWeekData[0].periodStart}-${fourWeekData[0].periodEnd} апталар үчүн` : 'Статистика'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="overflow-x-auto mb-6">
+                                            <table className="w-full">
+                                                <thead className="bg-indigo-50">
+                                                    <tr>
+                                                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Рейтинг</th>
+                                                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Команда</th>
+                                                        {fourWeekData.length > 0 && fourWeekData[0].weeklyScores.map((_, idx) => (
+                                                            <th key={idx} className="px-6 py-3 text-center text-sm font-semibold text-gray-700">
+                                                                Апта {fourWeekData[0].periodStart + idx}
+                                                            </th>
+                                                        ))}
+                                                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Орточо упай</th>
+                                                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Эң жакшы</th>
+                                                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Эң начар</th>
+                                                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Өнүгүү тенденциясы</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200">
+                                                    {fourWeekData.map((team) => (
+                                                        <tr key={team.teamName} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-6 py-4">
+                                                                <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg ${team.ranking === 1 ? 'bg-yellow-400 text-yellow-900' :
+                                                                    team.ranking === 2 ? 'bg-gray-300 text-gray-800' :
+                                                                        team.ranking === 3 ? 'bg-orange-400 text-orange-900' :
+                                                                            'bg-indigo-100 text-indigo-800'
+                                                                    }`}>
+                                                                    {team.ranking}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 font-medium text-gray-900">{team.teamName}</td>
+                                                            {team.weeklyScores.map((score, weekIdx) => (
+                                                                <td key={weekIdx} className="px-6 py-4 text-center text-gray-700">{score.toFixed(1)}</td>
+                                                            ))}
+                                                            <td className="px-6 py-4 text-center font-bold text-indigo-600 text-lg">{team.averageScore}</td>
+                                                            <td className="px-6 py-4 text-center text-green-600 font-semibold">{team.bestWeek}</td>
+                                                            <td className="px-6 py-4 text-center text-red-600 font-semibold">{team.worstWeek}</td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                {team.trends === 'up' && <span className="text-green-600 font-bold">📈 Өсүш</span>}
+                                                                {team.trends === 'down' && <span className="text-red-600 font-bold">📉 Төмөндөш</span>}
+                                                                {team.trends === 'stable' && <span className="text-blue-600 font-bold">➡️ Туруктуулук</span>}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Info about trend calculation */}
+                                        {fourWeekData.length > 0 && (
+                                            <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mb-6">
+                                                <div className="flex items-start gap-2">
+                                                    <Info className="w-5 h-5 text-green-700 mt-0.5 flex-shrink-0" />
+                                                    <div className="text-sm text-green-800">
+                                                        <p className="font-semibold mb-1">
+                                                            Өнүгүү тенденциясы кантип эсептелет?
+                                                        </p>
+                                                        <p className="mb-2">Бирден чыгарууда, 4 аптаны биринчи эки аптасынын жыйынтыгы менен акыркы эки аптасынын жыйынтыгы салыштырылат:</p>
+                                                        <ul className="list-disc list-inside space-y-1 ml-2">
+                                                            <li>📈 Өсүш - акыркы эки аптадагы упайлар биринчи эки аптадан жогору болгондо</li>
+                                                            <li>📉 Төмөндөш - акыркы эки аптадагы упайлар биринчи эки аптадан төмөн болгондо</li>
+                                                            <li>➡️ Туруктуулук - эки мезгилдин упайлары бирдей болгондо</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Detailed Chart for 4 weeks */}
+                                        {fourWeekData.length > 0 && data && (() => {
+                                            const totalWeeks = data.weeks.length;
+                                            const periodIndex = Math.floor((totalWeeks - 1) / 4);
+                                            const startWeekIndex = periodIndex * 4;
+                                            const endWeekIndex = Math.min(startWeekIndex + 4, totalWeeks);
+                                            const weeksForPeriod = data.weeks.slice(startWeekIndex, endWeekIndex);
+                                            
+                                            return (
+                                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                                    <h3 className="text-xl font-bold text-gray-800 mb-4">
+                                                        {fourWeekData[0].periodStart}-{fourWeekData[0].periodEnd} апталар боюнча графика
+                                                    </h3>
+                                                    <ResponsiveContainer width="100%" height={400}>
+                                                        <LineChart data={
+                                                            weeksForPeriod.map(week => {
+                                                                const dataPoint: any = { week: `Апта ${week.weekNumber}` };
+                                                                week.teams.forEach(team => {
+                                                                    const avgScore = team.members.reduce((sum, m) => sum + calculateMemberScore(m), 0) / team.members.length;
+                                                                    dataPoint[team.name] = Math.round(avgScore * 10) / 10;
+                                                                });
+                                                                return dataPoint;
+                                                            })
+                                                        }>
+                                                            <CartesianGrid strokeDasharray="3 3" />
+                                                            <XAxis dataKey="week" />
+                                                            <YAxis label={{ value: 'Орточо упай', angle: -90, position: 'insideLeft' }} />
+                                                            <Tooltip />
+                                                            <Legend />
+                                                            {fourWeekData.map((team, idx) => (
+                                                                <Line
+                                                                    key={team.teamName}
+                                                                    type="monotone"
+                                                                    dataKey={team.teamName}
+                                                                    stroke={TEAM_COLORS[idx % TEAM_COLORS.length]}
+                                                                    strokeWidth={3}
+                                                                    name={team.teamName}
+                                                                />
+                                                            ))}
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            );
+                                        })()}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </>
+                ) : null}
             </div>
         </div>
     );
