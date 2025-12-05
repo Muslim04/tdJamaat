@@ -16,12 +16,14 @@ import { Header } from './components/Header';
 import { WeekSelector } from './components/WeekSelector';
 import { FormulaDisplay } from './components/FormulaDisplay';
 import { ViewNavigator } from './components/ViewNavigator';
+import { FourWeekPeriodSelector } from './components/FourWeekPeriodSelector';
 
 const TeamPerformanceTracker: React.FC = () => {
     const [data, setData] = useState<DataFile | null>(null);
     const [activeTeam, setActiveTeam] = useState<number>(0);
     const [activeView, setActiveView] = useState<'overview' | 'teams' | 'progress' | 'fourweekreport'>('overview');
     const [selectedWeek, setSelectedWeek] = useState<number>(0);
+    const [selectedPeriod, setSelectedPeriod] = useState<number>(0);
     const [showFormula, setShowFormula] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,10 @@ const TeamPerformanceTracker: React.FC = () => {
 
                 setData(jsonData);
                 setSelectedWeek(jsonData.weeks.length - 1);
+                // Set to the most recent period (last complete 4-week period)
+                const totalWeeks = jsonData.weeks.length;
+                const totalPeriods = Math.ceil(totalWeeks / 4);
+                setSelectedPeriod(Math.max(0, totalPeriods - 1));
                 setError(null);
             } catch (err) {
                 setError('Маалыматтарды жүктөөдө ката кетти. team_data.json файлын текшериңиз.');
@@ -120,7 +126,15 @@ const TeamPerformanceTracker: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
             <div className="max-w-7xl mx-auto">
                 <Header showFormula={showFormula} setShowFormula={setShowFormula} />
-                <WeekSelector data={data} selectedWeek={selectedWeek} setSelectedWeek={setSelectedWeek} />
+                {activeView === 'fourweekreport' ? (
+                    <FourWeekPeriodSelector 
+                        data={data} 
+                        selectedPeriod={selectedPeriod} 
+                        setSelectedPeriod={setSelectedPeriod} 
+                    />
+                ) : (
+                    <WeekSelector data={data} selectedWeek={selectedWeek} setSelectedWeek={setSelectedWeek} />
+                )}
                 <FormulaDisplay showFormula={showFormula} />
                 <ViewNavigator activeView={activeView} setActiveView={setActiveView} />
 
@@ -502,11 +516,9 @@ const TeamPerformanceTracker: React.FC = () => {
                                 }> = [];
 
                                 if (data && data.weeks.length > 0) {
-                                    // Calculate which 4-week period to show
-                                    // Always show the most recent complete 4-week period
+                                    // Calculate which 4-week period to show based on selectedPeriod
                                     const totalWeeks = data.weeks.length;
-                                    const periodIndex = Math.floor((totalWeeks - 1) / 4); // 0 for weeks 1-4, 1 for weeks 5-8, etc.
-                                    const startWeekIndex = periodIndex * 4;
+                                    const startWeekIndex = selectedPeriod * 4;
                                     const endWeekIndex = Math.min(startWeekIndex + 4, totalWeeks);
                                     
                                     // Get the weeks for this period
@@ -570,7 +582,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                                         <p className="font-semibold mb-1">
                                                             Көрсөтүлгөн мезгил: Апта {fourWeekData[0].periodStart} - Апта {fourWeekData[0].periodEnd}
                                                         </p>
-                                                        <p>Бул отчет эң акыркы толук 4 апта боюнча маалыматты көрсөтөт</p>
+                                                        <p>Бул отчет тандалган 4 апта боюнча маалыматты көрсөтөт. Бардык 4-апталык мезгилдерди көрүү үчүн жогорудагы навигацияны колдонуңуз.</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -686,8 +698,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                         {/* Detailed Chart for 4 weeks */}
                                         {fourWeekData.length > 0 && data && (() => {
                                             const totalWeeks = data.weeks.length;
-                                            const periodIndex = Math.floor((totalWeeks - 1) / 4);
-                                            const startWeekIndex = periodIndex * 4;
+                                            const startWeekIndex = selectedPeriod * 4;
                                             const endWeekIndex = Math.min(startWeekIndex + 4, totalWeeks);
                                             const weeksForPeriod = data.weeks.slice(startWeekIndex, endWeekIndex);
                                             
