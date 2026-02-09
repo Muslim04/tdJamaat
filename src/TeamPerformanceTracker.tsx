@@ -1,15 +1,18 @@
 // TeamPerformanceTracker.tsx
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
-import { Users, Award, TrendingUp, Info } from 'lucide-react';
+import { Users, Award, TrendingUp, Info, Settings } from 'lucide-react';
 
 // Import types
-import type { DataFile } from './types';
+import type { DataFile, Team } from './types';
 
 // Import utilities
 import { calculateMemberScore, COLORS, TEAM_COLORS, weights } from './utils/scoring';
 import type { MetricValues } from './types';
 import { getTeamMemberRankings, getOverallTeamRankings, getProgressData } from './utils/rankings';
+
+// Import services
+import { fetchRecords } from './services/dataService';
 
 // Import components
 import { Header } from './components/Header';
@@ -17,6 +20,9 @@ import { WeekSelector } from './components/WeekSelector';
 import { FormulaDisplay } from './components/FormulaDisplay';
 import { ViewNavigator } from './components/ViewNavigator';
 import { FourWeekPeriodSelector } from './components/FourWeekPeriodSelector';
+import { AdminLogin } from './components/AdminLogin';
+import { DataEntryForm } from './components/DataEntryForm';
+
 
 const TeamPerformanceTracker: React.FC = () => {
     const [data, setData] = useState<DataFile | null>(null);
@@ -27,28 +33,32 @@ const TeamPerformanceTracker: React.FC = () => {
     const [showFormula, setShowFormula] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    // Load data from Supabase
     const [roleFilter, setRoleFilter] = useState<'all' | 'leader' | 'assistant' | 'member'>('all');
 
-    // Load data from JSON file
+    // Admin states
+    const [showAdminLogin, setShowAdminLogin] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [showDataEntry, setShowDataEntry] = useState(false);
+    const [editingTeam, setEditingTeam] = useState<{ team: Team, weekNumber: number } | null>(null);
+
     useEffect(() => {
         const loadData = async () => {
             try {
                 setLoading(true);
-                const response = await fetch('/teams_data.json');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch teams data');
-                }
-                const jsonData: DataFile = await response.json();
+                const jsonData = await fetchRecords();
 
                 setData(jsonData);
-                setSelectedWeek(jsonData.weeks.length - 1);
-                // Set to the most recent period (last complete 4-week period)
-                const totalWeeks = jsonData.weeks.length;
-                const totalPeriods = Math.ceil(totalWeeks / 4);
-                setSelectedPeriod(Math.max(0, totalPeriods - 1));
+                if (jsonData && jsonData.weeks.length > 0) {
+                    setSelectedWeek(jsonData.weeks.length - 1);
+                    // Set to the most recent period (last complete 4-week period)
+                    const totalWeeks = jsonData.weeks.length;
+                    const totalPeriods = Math.ceil(totalWeeks / 4);
+                    setSelectedPeriod(Math.max(0, totalPeriods - 1));
+                }
                 setError(null);
             } catch (err) {
-                setError('Маалыматтарды жүктөөдө ката кетти. team_data.json файлын текшериңиз.');
+                setError('Маалыматтарды жүктөөдө ката кетти. Сураныч, интернет байланышын текшериңиз же кийинчерээк кайра аракет кылыңыз.');
                 console.error('Error loading data:', err);
             } finally {
                 setLoading(false);
@@ -66,12 +76,12 @@ const TeamPerformanceTracker: React.FC = () => {
         );
     }
 
-    if (error || !data) {
+    if (error || !data || data.weeks.length === 0) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
                 <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
-                    <h2 className="text-2xl font-bold text-red-600 mb-4">Ката</h2>
-                    <p className="text-gray-700">{error}</p>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">{error ? 'Ката' : 'Маалымат жок'}</h2>
+                    <p className="text-gray-700">{error || 'Учурда маалымат базасы бош. Жаңы маалыматтарды киргизиңиз.'}</p>
                 </div>
             </div>
         );
@@ -125,17 +135,37 @@ const TeamPerformanceTracker: React.FC = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
             <div className="max-w-7xl mx-auto">
-                <Header showFormula={showFormula} setShowFormula={setShowFormula} />
+                <Header
+                    showFormula={showFormula}
+                    setShowFormula={setShowFormula}
+                    onAdminClick={() => {
+                        if (isAuthenticated) {
+                            setShowDataEntry(true);
+                        } else {
+                            setShowAdminLogin(true);
+                        }
+                    }}
+                    isAuthenticated={isAuthenticated}
+                    onLogout={() => {
+                        setIsAuthenticated(false);
+                        setShowDataEntry(false);
+                        setEditingTeam(null);
+                    }}
+                />
                 {activeView === 'fourweekreport' ? (
-                    <FourWeekPeriodSelector 
-                        data={data} 
-                        selectedPeriod={selectedPeriod} 
-                        setSelectedPeriod={setSelectedPeriod} 
+                    <FourWeekPeriodSelector
+                        data={data}
+                        selectedPeriod={selectedPeriod}
+                        setSelectedPeriod={setSelectedPeriod}
                     />
                 ) : (
                     <WeekSelector data={data} selectedWeek={selectedWeek} setSelectedWeek={setSelectedWeek} />
                 )}
                 <FormulaDisplay showFormula={showFormula} />
+                <FormulaDisplay showFormula={showFormula} />
+
+
+
                 <ViewNavigator activeView={activeView} setActiveView={setActiveView} />
 
                 {activeView === 'overview' ? (
@@ -298,7 +328,22 @@ const TeamPerformanceTracker: React.FC = () => {
 
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                             {/* MiniCard section for team activity summary */}
-                            <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                            <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200 relative">
+                                {isAuthenticated && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingTeam({
+                                                team: currentWeekData.teams[activeTeam],
+                                                weekNumber: currentWeekData.weekNumber
+                                            });
+                                            setShowDataEntry(true);
+                                        }}
+                                        className="absolute top-4 right-4 flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-200 font-medium text-sm"
+                                    >
+                                        <Settings className="w-4 h-4" />
+                                        Өзгөртүү
+                                    </button>
+                                )}
                                 <h3 className="text-xl font-semibold text-gray-800 mb-4">Команданын активдүүлүк көрсөткүчтөрү</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                                     {Object.entries(currentWeekData.teams[activeTeam].miniCard).map(([key, value]) => {
@@ -520,17 +565,17 @@ const TeamPerformanceTracker: React.FC = () => {
                                     const totalWeeks = data.weeks.length;
                                     const startWeekIndex = selectedPeriod * 4;
                                     const endWeekIndex = Math.min(startWeekIndex + 4, totalWeeks);
-                                    
+
                                     // Get the weeks for this period
                                     const weeksForPeriod = data.weeks.slice(startWeekIndex, endWeekIndex);
                                     const actualStartWeek = weeksForPeriod[0]?.weekNumber || 1;
                                     const actualEndWeek = weeksForPeriod[weeksForPeriod.length - 1]?.weekNumber || 4;
-                                    
+
                                     const teamNames = data.weeks[0]?.teams.map(t => t.name) || [];
-                                    
+
                                     teamNames.forEach(teamName => {
                                         const weeklyScores: number[] = [];
-                                        
+
                                         weeksForPeriod.forEach(weekData => {
                                             const team = weekData.teams.find(t => t.name === teamName);
                                             if (team) {
@@ -543,7 +588,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                         const totalScore = weeklyScores.reduce((sum, score) => sum + score, 0);
                                         const bestWeek = weeklyScores.length > 0 ? Math.max(...weeklyScores) : 0;
                                         const worstWeek = weeklyScores.length > 0 ? Math.min(...weeklyScores) : 0;
-                                        
+
                                         // Determine trend
                                         const firstHalf = weeklyScores.slice(0, Math.ceil(weeklyScores.length / 2)).reduce((a, b) => a + b, 0);
                                         const secondHalf = weeklyScores.slice(Math.floor(weeklyScores.length / 2)).reduce((a, b) => a + b, 0);
@@ -701,7 +746,7 @@ const TeamPerformanceTracker: React.FC = () => {
                                             const startWeekIndex = selectedPeriod * 4;
                                             const endWeekIndex = Math.min(startWeekIndex + 4, totalWeeks);
                                             const weeksForPeriod = data.weeks.slice(startWeekIndex, endWeekIndex);
-                                            
+
                                             return (
                                                 <div className="bg-white rounded-lg shadow-lg p-6">
                                                     <h3 className="text-xl font-bold text-gray-800 mb-4">
@@ -745,6 +790,35 @@ const TeamPerformanceTracker: React.FC = () => {
                     </>
                 ) : null}
             </div>
+
+            {/* Modals */}
+            {showAdminLogin && (
+                <AdminLogin
+                    onLogin={() => {
+                        setIsAuthenticated(true);
+                        setShowAdminLogin(false);
+                        setShowDataEntry(true);
+                    }}
+                    onClose={() => setShowAdminLogin(false)}
+                />
+            )}
+
+            {showDataEntry && (
+                <DataEntryForm
+                    data={data}
+                    onClose={() => {
+                        setShowDataEntry(false);
+                        setEditingTeam(null);
+                    }}
+                    onSuccess={() => {
+                        setShowDataEntry(false);
+                        setEditingTeam(null);
+                        // Refresh data
+                        window.location.reload();
+                    }}
+                    initialData={editingTeam}
+                />
+            )}
         </div>
     );
 };

@@ -36,6 +36,7 @@ export interface Team {
     name: string;
     miniCard: MiniCard;
     members: TeamMember[];
+    id?: string; // Optional: Database record ID for editing
 }
 
 export interface WeekData {
