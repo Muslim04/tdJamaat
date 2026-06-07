@@ -1,7 +1,7 @@
 // TeamPerformanceTracker.tsx
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
-import { Users, Award, TrendingUp, Info, Settings } from 'lucide-react';
+import { Users, Award, TrendingUp, Info, Settings, Star } from 'lucide-react';
 
 // Import types
 import type { DataFile, Team } from './types';
@@ -27,7 +27,7 @@ import { DataEntryForm } from './components/DataEntryForm';
 const TeamPerformanceTracker: React.FC = () => {
     const [data, setData] = useState<DataFile | null>(null);
     const [activeTeam, setActiveTeam] = useState<number>(0);
-    const [activeView, setActiveView] = useState<'overview' | 'teams' | 'progress' | 'fourweekreport'>('overview');
+    const [activeView, setActiveView] = useState<'overview' | 'teams' | 'progress' | 'fourweekreport' | 'totalratings'>('overview');
     const [selectedWeek, setSelectedWeek] = useState<number>(0);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(0);
     const [showFormula, setShowFormula] = useState<boolean>(false);
@@ -788,6 +788,89 @@ const TeamPerformanceTracker: React.FC = () => {
                             })()}
                         </div>
                     </>
+                ) : activeView === 'totalratings' ? (
+                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <Star className="w-8 h-8 text-indigo-600" />
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800">Жалпы рейтинг (5-аптадан)</h2>
+                                <p className="text-gray-600">5-аптадан баштап акыркы аптага чейинки командалардын жалпы рейтингдери (орточо упайлардын суммасы)</p>
+                            </div>
+                        </div>
+                        {(() => {
+                            if (!data || data.weeks.length === 0) return null;
+                            const relevantWeeks = data.weeks.filter(w => w.weekNumber >= 5);
+                            if (relevantWeeks.length === 0) {
+                                return (
+                                    <div className="text-center p-8 text-gray-500 font-semibold">
+                                        5-аптадан баштап маалымат табылган жок.
+                                    </div>
+                                );
+                            }
+
+                            const teamNames = data.weeks[0]?.teams.map(t => t.name) || [];
+                            const totalRatings: { teamName: string; totalScore: number; weeklyScores: number[]; averageScore: number }[] = [];
+
+                            teamNames.forEach(teamName => {
+                                const weeklyScores: number[] = [];
+                                relevantWeeks.forEach(weekData => {
+                                    const team = weekData.teams.find(t => t.name === teamName);
+                                    if (team) {
+                                        const avgScore = team.members.reduce((sum, m) => sum + calculateMemberScore(m), 0) / team.members.length;
+                                        weeklyScores.push(Math.round(avgScore * 10) / 10);
+                                    }
+                                });
+                                
+                                const totalScore = weeklyScores.reduce((sum, score) => sum + score, 0);
+                                const averageScore = weeklyScores.length > 0 ? totalScore / weeklyScores.length : 0;
+
+                                totalRatings.push({
+                                    teamName,
+                                    totalScore: Math.round(totalScore * 10) / 10,
+                                    weeklyScores,
+                                    averageScore: Math.round(averageScore * 10) / 10
+                                });
+                            });
+
+                            totalRatings.sort((a, b) => b.totalScore - a.totalScore);
+
+                            return (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-indigo-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left font-semibold text-gray-700">№</th>
+                                                <th className="px-6 py-3 text-left font-semibold text-gray-700">Команда</th>
+                                                <th className="px-6 py-3 text-center font-semibold text-gray-700">Катышкан апталар</th>
+                                                <th className="px-6 py-3 text-right font-semibold text-gray-700">Жалпы упай (Сумма)</th>
+                                                <th className="px-6 py-3 text-right font-semibold text-gray-700">Орточо упай</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {totalRatings.map((team, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                                                            idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                                            idx === 1 ? 'bg-gray-300 text-gray-800' :
+                                                            idx === 2 ? 'bg-orange-400 text-orange-900' :
+                                                            'bg-indigo-100 text-indigo-800'
+                                                        }`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 font-medium text-gray-900">{team.teamName}</td>
+                                                    <td className="px-6 py-4 text-center text-gray-600">{team.weeklyScores.length}</td>
+                                                    <td className="px-6 py-4 text-right font-bold text-indigo-600 text-lg">{team.totalScore}</td>
+                                                    <td className="px-6 py-4 text-right text-gray-500">{team.averageScore}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })()}
+                    </div>
                 ) : null}
             </div>
 

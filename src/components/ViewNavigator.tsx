@@ -1,7 +1,7 @@
 import React from 'react';
-import { Users, TrendingUp, Calendar, Award } from 'lucide-react';
+import { Users, TrendingUp, Calendar, Award, Star } from 'lucide-react';
 
-type ActiveView = 'overview' | 'teams' | 'progress' | 'fourweekreport';
+type ActiveView = 'overview' | 'teams' | 'progress' | 'fourweekreport' | 'totalratings';
 
 interface ViewNavigatorProps {
     activeView: ActiveView;
@@ -51,6 +51,16 @@ export const ViewNavigator: React.FC<ViewNavigatorProps> = ({ activeView, setAct
                 >
                     <Award className="w-5 h-5 inline mr-2" />
                     4-Апталык отчёт
+                </button>
+                <button
+                    onClick={() => setActiveView('totalratings')}
+                    className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${activeView === 'totalratings'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                >
+                    <Star className="w-5 h-5 inline mr-2" />
+                    Жалпы рейтинг (5-аптадан)
                 </button>
             </div>
         </div>
